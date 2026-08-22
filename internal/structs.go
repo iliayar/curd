@@ -66,6 +66,7 @@ type Episode struct {
 type NextEpisode struct {
 	Number       int
 	Links        []string
+	LinkHints    map[string]StreamPlaybackHint
 	ProviderName string
 	ProviderId   string
 	Mode         string

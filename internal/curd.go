@@ -1308,12 +1308,11 @@ func StartCurd(userCurdConfig *CurdConfig, anime *Anime) string {
 
 	if (anime.Ep.NextEpisode.Number == anime.Ep.Number) && (len(anime.Ep.NextEpisode.Links) > 0) {
 		anime.Ep.Links = anime.Ep.NextEpisode.Links
-		anime.Ep.StreamReferrer = ""
-		anime.Ep.SubtitleURL = ""
 		if anime.Ep.NextEpisode.ProviderName != "" {
 			anime.ProviderName = anime.Ep.NextEpisode.ProviderName
 			anime.ProviderId = anime.Ep.NextEpisode.ProviderId
 		}
+		applyStreamPlaybackHints(anime, anime.Ep.Links, anime.Ep.NextEpisode.LinkHints)
 	} else {
 		// Preferred-first resolve; diagnosed recovery only after that fails.
 		episodeResult, ok := resolveEpisodeLinksWithRecovery(userCurdConfig, anime, nil, true)
@@ -1352,6 +1351,7 @@ func StartCurd(userCurdConfig *CurdConfig, anime *Anime) string {
 				anime.Ep.NextEpisode = NextEpisode{
 					Number:       nextEpNum,
 					Links:        nextResult.Links,
+					LinkHints:    nextResult.LinkHints,
 					ProviderName: nextResult.ProviderName,
 					ProviderId:   nextResult.ProviderID,
 					Mode:         nextResult.Mode,
@@ -1777,12 +1777,11 @@ func StartNextEpisode(anime *Anime, userCurdConfig *CurdConfig, databaseFile str
 	// Use prefetched links if available for the next episode
 	if (anime.Ep.NextEpisode.Number == anime.Ep.Number) && (len(anime.Ep.NextEpisode.Links) > 0) {
 		anime.Ep.Links = anime.Ep.NextEpisode.Links
-		anime.Ep.StreamReferrer = ""
-		anime.Ep.SubtitleURL = ""
 		if anime.Ep.NextEpisode.ProviderName != "" {
 			anime.ProviderName = anime.Ep.NextEpisode.ProviderName
 			anime.ProviderId = anime.Ep.NextEpisode.ProviderId
 		}
+		applyStreamPlaybackHints(anime, anime.Ep.Links, anime.Ep.NextEpisode.LinkHints)
 		Log(fmt.Sprintf("Using prefetched links for episode %d", anime.Ep.Number))
 	} else {
 		// Clear links to force fetching new ones
