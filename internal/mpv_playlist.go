@@ -1193,6 +1193,7 @@ func (c *MPVPlaylistController) playSlot(slot playlistSlot) error {
 	anime.Ep.NextEpisode = NextEpisode{}
 	anime.Ep.StreamReferrer = ""
 	anime.Ep.SubtitleURL = ""
+	anime.Ep.SubtitleTracks = nil
 	anime.Ep.SkipTimes = SkipTimes{}
 
 	Log(fmt.Sprintf("MPV playlist: resolving stream for episode %d (%s) [was %d]", targetEp, mode, prevEp))
@@ -1360,9 +1361,11 @@ func loadEpisodeInRunningMPV(socket, link, title string, anime *Anime) error {
 	if anime != nil {
 		sub := strings.TrimSpace(anime.Ep.SubtitleURL)
 		if sub != "" {
+			tracks := anime.Ep.SubtitleTracks
 			go func() {
 				_ = waitForMPVFileReady(socket, link, 12*time.Second)
 				_, _ = MPVSendCommand(socket, []interface{}{"sub-add", sub, "select"})
+				attachExtraSubtitleTracks(socket, tracks)
 			}()
 		}
 	}

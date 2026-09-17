@@ -212,6 +212,31 @@ func hasMPVReferrerArg(args []string) bool {
 	return false
 }
 
+// attachExtraSubtitleTracks loads every subtitle track beyond the primary
+// (already selected via --sub-file or an earlier "sub-add ... select") as
+// additional, switchable mpv subtitle tracks — best-effort, since by this
+// point mpv is already playing and a failed add here shouldn't block playback.
+func attachExtraSubtitleTracks(socketPath string, tracks []SubtitleTrack) {
+	if socketPath == "" || len(tracks) < 2 {
+		return
+	}
+	for _, track := range tracks[1:] {
+		url := strings.TrimSpace(track.URL)
+		if url == "" {
+			continue
+		}
+		title := strings.TrimSpace(track.Title)
+		lang := strings.TrimSpace(track.Lang)
+		command := []interface{}{"sub-add", url, "auto"}
+		if title != "" || lang != "" {
+			command = append(command, title, lang)
+		}
+		if _, err := MPVSendCommand(socketPath, command); err != nil {
+			Log(fmt.Sprintf("Failed to attach extra subtitle track %q: %v", title, err))
+		}
+	}
+}
+
 func hasMPVSubtitleArg(args []string) bool {
 	for i, arg := range args {
 		lowerArg := strings.ToLower(strings.TrimSpace(arg))
@@ -342,6 +367,7 @@ func StartVideo(link string, args []string, title string, anime *Anime) (string,
 			if subErr != nil {
 				Log(fmt.Sprintf("Failed to load subtitle track: %v", subErr))
 			}
+			attachExtraSubtitleTracks(mpvSocketPath, anime.Ep.SubtitleTracks)
 		}
 
 		// Update the window title
@@ -474,6 +500,10 @@ func StartVideo(link string, args []string, title string, anime *Anime) (string,
 	if !socketReady {
 		Log(fmt.Sprintf("Failed to connect to MPV socket after %d attempts", maxRetries))
 		// Don't fail here, just warn and continue - the next commands will handle any further issues
+	} else if subtitleURL != "" && !callerHasSubtitleArg {
+		// The primary subtitle already loaded via --sub-file at launch; add
+		// the rest (if any) now that we can talk to mpv over IPC.
+		attachExtraSubtitleTracks(mpvSocketPath, anime.Ep.SubtitleTracks)
 	}
 
 	return mpvSocketPath, nil

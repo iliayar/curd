@@ -16,10 +16,28 @@ type PlaybackConfig struct {
 	SubStyle string
 }
 
+// SubtitleTrack is one selectable external subtitle for mpv, with enough
+// metadata (Title, Lang) for it to show up as a distinguishable option in
+// mpv's subtitle track menu instead of a bare URL.
+type SubtitleTrack struct {
+	URL   string
+	Title string
+	Lang  string
+}
+
 // StreamPlaybackHint carries MPV playback metadata for a resolved stream URL.
 type StreamPlaybackHint struct {
 	Referrer string
+	// Subtitle is the primary/default subtitle URL, kept for providers and
+	// callers that only deal with a single track. When Subtitles is set,
+	// its first entry's URL should match Subtitle.
 	Subtitle string
+	// Subtitles lists every subtitle track the provider found for this
+	// stream (e.g. multiple fansub groups or languages), so the host can
+	// hand them all to mpv and let the viewer switch if the default one
+	// has a problem. Optional — providers that only support one track can
+	// leave this nil and rely on Subtitle alone.
+	Subtitles []SubtitleTrack
 }
 
 // Provider resolves catalog search, episode lists, and stream URLs.

@@ -105,6 +105,17 @@ func toPlaybackConfig(config CurdConfig) providers.PlaybackConfig {
 	}
 }
 
+func fromSubtitleTracks(tracks []providers.SubtitleTrack) []SubtitleTrack {
+	if len(tracks) == 0 {
+		return nil
+	}
+	result := make([]SubtitleTrack, 0, len(tracks))
+	for _, t := range tracks {
+		result = append(result, SubtitleTrack{URL: t.URL, Title: t.Title, Lang: t.Lang})
+	}
+	return result
+}
+
 func fromStreamHints(hints map[string]providers.StreamPlaybackHint) map[string]StreamPlaybackHint {
 	if len(hints) == 0 {
 		return nil
@@ -112,8 +123,9 @@ func fromStreamHints(hints map[string]providers.StreamPlaybackHint) map[string]S
 	result := make(map[string]StreamPlaybackHint, len(hints))
 	for key, hint := range hints {
 		result[key] = StreamPlaybackHint{
-			Referrer: hint.Referrer,
-			Subtitle: hint.Subtitle,
+			Referrer:  hint.Referrer,
+			Subtitle:  hint.Subtitle,
+			Subtitles: fromSubtitleTracks(hint.Subtitles),
 		}
 	}
 	return result
@@ -186,8 +198,10 @@ func applyStreamPlaybackHints(anime *Anime, links []string, hints map[string]Str
 	if hint, ok := hints[selected]; ok {
 		anime.Ep.StreamReferrer = hint.Referrer
 		anime.Ep.SubtitleURL = hint.Subtitle
+		anime.Ep.SubtitleTracks = hint.Subtitles
 		return
 	}
 	anime.Ep.StreamReferrer = ""
 	anime.Ep.SubtitleURL = ""
+	anime.Ep.SubtitleTracks = nil
 }

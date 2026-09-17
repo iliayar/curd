@@ -231,8 +231,98 @@ func TestGetEpisodeStreamsForModePicksHighestPriorityEnglishSub(t *testing.T) {
 		t.Fatalf("unexpected links %#v", links)
 	}
 	hint := hints[links[0]]
-	if !strings.Contains(hint.Subtitle, "access_token=test-token") {
-		t.Fatalf("expected subtitle url to carry access_token, got %q", hint.Subtitle)
+	if !strings.Contains(hint.Subtitle, "translations/vtt/3") || !strings.Contains(hint.Subtitle, "access_token=test-token") {
+		t.Fatalf("expected primary subtitle url for translation 3 with access_token, got %q", hint.Subtitle)
+	}
+
+	// All three active sub-kind translations should be offered, primary
+	// (id 3, the highest-priority English one) first, then the rest by
+	// priority — so mpv shows every option and the viewer can switch off
+	// the default if it turns out broken or incomplete for this episode.
+	if len(hint.Subtitles) != 3 {
+		t.Fatalf("expected 3 subtitle tracks, got %d: %+v", len(hint.Subtitles), hint.Subtitles)
+	}
+	if hint.Subtitles[0].URL != hint.Subtitle {
+		t.Fatalf("expected first track to be the primary, got %+v", hint.Subtitles[0])
+	}
+	wantOrder := []string{"translations/vtt/3", "translations/vtt/1", "translations/vtt/2"}
+	for i, want := range wantOrder {
+		if !strings.Contains(hint.Subtitles[i].URL, want) {
+			t.Fatalf("track %d: expected url containing %q, got %q", i, want, hint.Subtitles[i].URL)
+		}
+	}
+}
+
+// A Blu-ray source is cleaner than a TV-broadcast rip at any resolution, so
+// it should win even when the site's own priority number briefly favors a
+// tv-sourced translation (e.g. a fast TV release before the BD lands).
+func TestGetEpisodeStreamsForModePrefersBDOverHigherPriorityTV(t *testing.T) {
+	withToken_(t, "test-token")
+	withTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/api/series/30414":
+			writeEnvelope(w, seriesDetail{Episodes: []episodeSummary{
+				{ID: 291395, EpisodeInt: 1, EpisodeType: "tv", IsActive: 1},
+			}})
+		case r.URL.Path == "/api/episodes/291395":
+			writeEnvelope(w, episodeDetail{Translations: []translation{
+				{ID: 1, TypeKind: "sub", TypeLang: "en", IsActive: 1, Priority: 999999, QualityType: "tv"},
+				{ID: 2, TypeKind: "sub", TypeLang: "en", IsActive: 1, Priority: 100, QualityType: "bd"},
+			}})
+		case r.URL.Path == "/api/translations/embed/2":
+			writeEnvelope(w, embedData{
+				Stream: []embedStream{{Height: 1080, URLs: []string{"https://cdn.example/bd-1080.mp4"}}},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	})
+
+	links, _, err := getEpisodeStreamsForMode("30414", providers.PlaybackConfig{SubOrDub: "sub"}, 1)
+	if err != nil {
+		t.Fatalf("getEpisodeStreamsForMode: %v", err)
+	}
+	if len(links) != 1 || links[0] != "https://cdn.example/bd-1080.mp4" {
+		t.Fatalf("expected the bd translation despite lower priority, got %#v", links)
+	}
+}
+
+// If the top-ranked candidate's stream lookup fails or comes back empty
+// (stale/broken CDN entry), fall through to the next-best candidate instead
+// of failing playback outright while a working, still high-quality option
+// is available.
+func TestGetEpisodeStreamsForModeFallsBackWhenTopCandidateHasNoStreams(t *testing.T) {
+	withToken_(t, "test-token")
+	withTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/api/series/30414":
+			writeEnvelope(w, seriesDetail{Episodes: []episodeSummary{
+				{ID: 291395, EpisodeInt: 1, EpisodeType: "tv", IsActive: 1},
+			}})
+		case r.URL.Path == "/api/episodes/291395":
+			writeEnvelope(w, episodeDetail{Translations: []translation{
+				{ID: 1, TypeKind: "sub", TypeLang: "en", IsActive: 1, Priority: 200, QualityType: "bd"},
+				{ID: 2, TypeKind: "sub", TypeLang: "en", IsActive: 1, Priority: 100, QualityType: "tv"},
+			}})
+		case r.URL.Path == "/api/translations/embed/1":
+			// Top candidate: active per the episode list, but its embed has
+			// no usable stream (e.g. a dead/expired CDN entry).
+			writeEnvelope(w, embedData{Stream: nil})
+		case r.URL.Path == "/api/translations/embed/2":
+			writeEnvelope(w, embedData{
+				Stream: []embedStream{{Height: 720, URLs: []string{"https://cdn.example/fallback-720.mp4"}}},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	})
+
+	links, _, err := getEpisodeStreamsForMode("30414", providers.PlaybackConfig{SubOrDub: "sub"}, 1)
+	if err != nil {
+		t.Fatalf("getEpisodeStreamsForMode: %v", err)
+	}
+	if len(links) != 1 || links[0] != "https://cdn.example/fallback-720.mp4" {
+		t.Fatalf("expected fallback to the next candidate, got %#v", links)
 	}
 }
 

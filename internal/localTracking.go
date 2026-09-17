@@ -467,6 +467,7 @@ func WatchUntracked(userCurdConfig *CurdConfig) {
 			anime.Ep.Links = anime.Ep.NextEpisode.Links
 			anime.Ep.StreamReferrer = ""
 			anime.Ep.SubtitleURL = ""
+			anime.Ep.SubtitleTracks = nil
 			if anime.Ep.NextEpisode.ProviderName != "" {
 				anime.ProviderName = anime.Ep.NextEpisode.ProviderName
 				anime.ProviderId = anime.Ep.NextEpisode.ProviderId

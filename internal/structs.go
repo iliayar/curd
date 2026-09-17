@@ -53,11 +53,16 @@ type Episode struct {
 	Links          []string     `json:"links"`
 	StreamReferrer string       `json:"-"`
 	SubtitleURL    string       `json:"-"`
-	NextEpisode    NextEpisode  `json:"next_episode"`
-	IsFiller       bool         `json:"filler"`
-	IsRecap        bool         `json:"recap"`
-	Aired          string       `json:"aired"`
-	Synopsis       string       `json:"synopsis"`
+	// SubtitleTracks lists every subtitle track the provider found for the
+	// current stream (SubtitleURL is always tracks[0].URL when non-empty).
+	// Extra tracks beyond the primary are attached to mpv as switchable
+	// alternatives, not forced on the viewer.
+	SubtitleTracks []SubtitleTrack `json:"-"`
+	NextEpisode    NextEpisode     `json:"next_episode"`
+	IsFiller       bool            `json:"filler"`
+	IsRecap        bool            `json:"recap"`
+	Aired          string          `json:"aired"`
+	Synopsis       string          `json:"synopsis"`
 	ContinueLast   bool
 	LastWasSkipped bool // used in filler check
 	IsCompleted    bool
@@ -79,8 +84,17 @@ type NextAiringEpisodeInfo struct {
 
 // StreamPlaybackHint carries MPV playback metadata for a resolved stream URL.
 type StreamPlaybackHint struct {
-	Referrer string
-	Subtitle string
+	Referrer  string
+	Subtitle  string
+	Subtitles []SubtitleTrack
+}
+
+// SubtitleTrack is one selectable external subtitle for mpv; see
+// providers.SubtitleTrack, which this mirrors across the provider boundary.
+type SubtitleTrack struct {
+	URL   string
+	Title string
+	Lang  string
 }
 
 type playingVideo struct {
