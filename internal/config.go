@@ -68,6 +68,7 @@ type CurdConfig struct {
 	MpvEpisodePlaylist         bool     `config:"MpvEpisodePlaylist"`
 	Provider                   string   `config:"Provider"`
 	DisabledProviders          string   `config:"DisabledProviders"`
+	SmotretAnimeToken          string   `config:"SmotretAnimeToken"`
 	ManualProviderSearch       bool     `config:"ManualProviderSearch"`
 	TrackingLocal              bool     `config:"TrackingLocal"`
 	TrackingRemote             string   `config:"TrackingRemote"`
@@ -130,6 +131,7 @@ func defaultConfigMap() map[string]string {
 		"MpvEpisodePlaylist":         "true",
 		"Provider":                   "stacked",
 		"DisabledProviders":          "[]",
+		"SmotretAnimeToken":          "",
 		"ManualProviderSearch":       "false",
 		"TrackingLocal":              "true",
 		"TrackingRemote":             "anilist",

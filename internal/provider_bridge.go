@@ -42,6 +42,18 @@ func init() {
 		return "english"
 	}
 	curdhost.SetCookiesForAnimepahe = SetCookiesForAnimepahe
+	curdhost.SmotretAnimeToken = func() string {
+		if cfg := GetGlobalConfig(); cfg != nil {
+			return cfg.SmotretAnimeToken
+		}
+		return ""
+	}
+	curdhost.SubsLanguage = func() string {
+		if cfg := GetGlobalConfig(); cfg != nil {
+			return cfg.SubsLanguage
+		}
+		return ""
+	}
 }
 
 func normalizeTranslationType(mode string) string {

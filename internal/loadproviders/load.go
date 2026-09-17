@@ -7,4 +7,5 @@ import (
 	_ "github.com/wraient/curd/internal/providers/anineko"
 	_ "github.com/wraient/curd/internal/providers/anipub"
 	_ "github.com/wraient/curd/internal/providers/senshi"
+	_ "github.com/wraient/curd/internal/providers/smotretanime"
 )

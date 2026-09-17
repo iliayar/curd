@@ -15,15 +15,17 @@ type PromptOption struct {
 
 // Host hooks are wired from the main application package during init.
 var (
-	HTTPClient             func() *http.Client
-	Log                    func(string)
-	Out                     func(string)
-	PromptSelect            func(options []PromptOption) (PromptOption, error)
-	CurrentSubStyle         func() string
+	HTTPClient                func() *http.Client
+	Log                       func(string)
+	Out                       func(string)
+	PromptSelect              func(options []PromptOption) (PromptOption, error)
+	CurrentSubStyle           func() string
 	PersistSubStylePreference func(style string) error
-	StoragePath             func() string
-	AnimeNameLanguage      func() string
-	SetCookiesForAnimepahe func(u *url.URL, cookies []*http.Cookie)
+	StoragePath               func() string
+	AnimeNameLanguage         func() string
+	SetCookiesForAnimepahe    func(u *url.URL, cookies []*http.Cookie)
+	SmotretAnimeToken         func() string
+	SubsLanguage              func() string
 )
 
 func HTTPStatusOK(statusCode int) bool {

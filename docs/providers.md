@@ -199,6 +199,8 @@ Providers must not call `internal` helpers directly. Use hooks in `internal/curd
 | `curdhost.StoragePath()` | `~/.local/share/curd` (or configured path) |
 | `curdhost.AnimeNameLanguage()` | `"english"` or `"romaji"` for search result labels |
 | `curdhost.HTTPStatusOK` / `HTTPStatusError` | Consistent HTTP error formatting |
+| `curdhost.SmotretAnimeToken()` | User's personal `SmotretAnimeToken` from `curd.conf` (Smotret-Anime API access token) |
+| `curdhost.SubsLanguage()` | `SubsLanguage` from `curd.conf` (`english`/`russian`) — preferred track language for Smotret-Anime, with the other language used as a fallback |
 
 Example:
 
@@ -332,6 +334,7 @@ Document the decision in a short ADR before building. The compile-time registry 
 | AniNeko | `internal/providers/anineko` | AJAX search, HTML scrape, bibiemb/vibeplayer embed resolution, `SubStyle` / `HintResolver` |
 | AllAnime | `internal/providers/allanime` | GraphQL search/episodes, parallel stream resolution, `HintResolver` |
 | Animepahe | `internal/providers/animepahe` | DDoS-Guard + rod browser, `IDResolver`, `DefaultDisabled`, `OptOutToken` |
+| Smotret-Anime | `internal/providers/smotretanime` | REST search/episodes (Anime 365 API), direct MP4/CDN streams + external WebVTT subs via `HintResolver`, requires a personal `SmotretAnimeToken` for stream/subtitle endpoints (search works without it) |
 
 Key host files:
 

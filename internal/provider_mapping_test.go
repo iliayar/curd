@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"strings"
 	"testing"
 
 	_ "github.com/wraient/curd/internal/loadproviders"
@@ -105,5 +106,48 @@ func TestApplyMatchedProviderMappingUsesSequentialProvider(t *testing.T) {
 	applyMatchedProviderMapping(config, state, &anime)
 	if anime.ProviderName != "anineko" || anime.ProviderId != "frieren-beyond-journeys-end" {
 		t.Fatalf("unexpected mapping %+v", anime)
+	}
+}
+
+// A multi-provider search runs one provider at a time and each can take up
+// to the shared HTTP client's timeout, so a silent wait before the "no
+// results, search again?" prompt can look like curd has hung. This locks in
+// that a visible "Searching..." message goes out first, for terminal users.
+func TestAnnounceProviderSearchStartPrintsForTerminalUsers(t *testing.T) {
+	previousConfig := GetGlobalConfig()
+	t.Cleanup(func() { SetGlobalConfig(previousConfig) })
+	config := &CurdConfig{}
+	SetGlobalConfig(config)
+
+	state := &providerMappingSearchState{query: "one piece", allProviders: []string{"senshi", "anipub"}}
+
+	output := captureStdout(t, func() {
+		announceProviderSearchStart(config, state)
+	})
+	if !strings.Contains(output, `"one piece"`) {
+		t.Fatalf("expected the announcement to mention the query, got %q", output)
+	}
+	if !strings.Contains(output, "senshi") || !strings.Contains(output, "anipub") {
+		t.Fatalf("expected the announcement to mention the providers being searched, got %q", output)
+	}
+}
+
+// Rofi mode already avoids notify-send spam for this flow (see
+// selectWithOptionalMessage, which uses -mesg instead) — the search-start
+// announcement should stay silent there rather than fire an extra
+// notification on every search and every "search with a different name" retry.
+func TestAnnounceProviderSearchStartSkipsNotifySpamUnderRofi(t *testing.T) {
+	previousConfig := GetGlobalConfig()
+	t.Cleanup(func() { SetGlobalConfig(previousConfig) })
+	config := &CurdConfig{RofiSelection: true}
+	SetGlobalConfig(config)
+
+	state := &providerMappingSearchState{query: "one piece", allProviders: []string{"senshi", "anipub"}}
+
+	output := captureStdout(t, func() {
+		announceProviderSearchStart(config, state)
+	})
+	if output != "" {
+		t.Fatalf("expected no stdout output under Rofi, got %q", output)
 	}
 }

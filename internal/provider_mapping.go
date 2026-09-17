@@ -12,6 +12,7 @@ import (
 
 	"github.com/wraient/curd/internal/providers/animepahe"
 	"github.com/wraient/curd/internal/providers/anipub"
+	"github.com/wraient/curd/internal/providers/smotretanime"
 )
 
 type ProviderMappingOutcome int
@@ -96,6 +97,27 @@ func searchAnimeForMapping(config *CurdConfig, state *providerMappingSearchState
 		return SearchAnime(state.query, mode)
 	}
 	return searchAnimeWithProviders(providers, state.query, mode)
+}
+
+// announceProviderSearchStart tells the user a (potentially slow, one
+// provider at a time) network search is starting, so a quiet stretch before
+// the "no results" recovery prompt doesn't look like curd has hung. Skipped
+// under Rofi, which already avoids notify-send spam for this same flow (see
+// selectWithOptionalMessage) in favor of showing the recovery message inline
+// via -mesg once the search actually finishes.
+func announceProviderSearchStart(config *CurdConfig, state *providerMappingSearchState) {
+	if config != nil && config.RofiSelection {
+		return
+	}
+	scope := state.currentProviderLabel()
+	if scope == "" || scope == "all configured providers" {
+		if providers := state.activeProviders(); len(providers) > 0 {
+			scope = strings.Join(providers, ", ")
+		} else {
+			scope = "configured providers"
+		}
+	}
+	CurdOut(fmt.Sprintf("Searching for %q on %s...", state.query, scope))
 }
 
 func confirmProviderMatch(option SelectionOption, reason string) bool {
@@ -499,6 +521,7 @@ func resolveAnimeProviderMapping(config *CurdConfig, anime *Anime, query string,
 
 	for {
 		Log(fmt.Sprintf("Searching for anime with query: %s, SubOrDub: %s, scope: %s", state.query, config.SubOrDub, state.currentProviderLabel()))
+		announceProviderSearchStart(config, state)
 
 		animeList, err := searchAnimeForMapping(config, state, config.SubOrDub)
 		if err != nil {
@@ -1003,6 +1026,7 @@ func ResolveUntrackedProviderSearch(config *CurdConfig, initialQuery string) (pr
 	}
 
 	for {
+		announceProviderSearchStart(config, state)
 		animeList, searchErr := searchAnimeForMapping(config, state, config.SubOrDub)
 		if searchErr != nil {
 			Log(fmt.Sprintf("Provider search failed: %v", searchErr))
@@ -1104,6 +1128,8 @@ func ResolveUntrackedProviderSearch(config *CurdConfig, initialQuery string) (pr
 func malIDFromProviderExtraData(extra any) int {
 	switch item := extra.(type) {
 	case anipub.SearchItem:
+		return item.MalID
+	case smotretanime.SearchItem:
 		return item.MalID
 	default:
 		return 0
