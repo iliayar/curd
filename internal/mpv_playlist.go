@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -485,12 +486,23 @@ func containsInt(nums []int, want int) bool {
 	return false
 }
 
+// playlistPos returns the active playlist index, or an error when MPV has no
+// active entry. MPV reports playlist-pos = -1 while idle (natural end of file,
+// failed load). Truncating that toward zero used to yield index 0, which the
+// selection watcher read as "user picked row 0" and restarted episode 1.
 func (c *MPVPlaylistController) playlistPos() (int, error) {
 	v, err := MPVSendCommand(c.socket, []interface{}{"get_property", "playlist-pos"})
 	if err != nil {
 		return -1, err
 	}
-	return int(mpvNumber(v) + 0.5), nil
+	if v == nil {
+		return -1, fmt.Errorf("playlist-pos unavailable")
+	}
+	pos := int(math.Round(mpvNumber(v)))
+	if pos < 0 {
+		return -1, fmt.Errorf("playlist-pos idle (%d)", pos)
+	}
+	return pos, nil
 }
 
 func (c *MPVPlaylistController) playlistCount() (int, error) {
@@ -587,6 +599,7 @@ func (c *MPVPlaylistController) watchPlaylistSelection() {
 	var samplePos int
 	haveSample := false
 	lastHeartbeat := time.Time{}
+	idleLogged := false
 
 	for {
 		if c.closed() {
@@ -629,6 +642,20 @@ func (c *MPVPlaylistController) watchPlaylistSelection() {
 				Log(fmt.Sprintf("MPV playlist: SAMPLE pos=%d path=%s", pos, truncateForLog(path, 50)))
 			}
 		}
+
+		// --- MPV idle: nothing loaded (natural end of file, failed load) ---
+		// No episode was picked, so never resolve a playlist row here. The main
+		// playback monitor classifies the completed episode and advances (the
+		// same path a manual mpv quit takes), reusing this idle window.
+		if strings.TrimSpace(path) == "" {
+			if !idleLogged {
+				idleLogged = true
+				Log(fmt.Sprintf("MPV playlist: mpv idle (no file loaded, pos err=%v) — playback monitor owns episode end", posErr))
+			}
+			time.Sleep(poll)
+			continue
+		}
+		idleLogged = false
 
 		// --- Primary: path became a placeholder (a row was picked) ---
 		// Resolve the episode from the frozen index + row title ONLY. The lavfi

@@ -1,9 +1,13 @@
 package internal
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -440,5 +444,98 @@ func TestLocalHistoryPath(t *testing.T) {
 	got := localHistoryPath("/tmp/curd-test-store")
 	if !strings.HasSuffix(got, "curd_history.txt") {
 		t.Fatalf("got %q", got)
+	}
+}
+
+// fakeMPVSocket answers every IPC request with a fixed playlist-pos payload.
+func fakeMPVSocket(t *testing.T, data interface{}) string {
+	t.Helper()
+	socket := filepath.Join(t.TempDir(), "mpv.sock")
+	ln, err := net.Listen("unix", socket)
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(conn net.Conn) {
+				defer conn.Close()
+				reader := bufio.NewReader(conn)
+				for {
+					line, err := reader.ReadBytes('\n')
+					if len(line) == 0 || err != nil {
+						return
+					}
+					var req map[string]interface{}
+					if json.Unmarshal(line, &req) != nil {
+						return
+					}
+					resp, _ := json.Marshal(map[string]interface{}{
+						"data":       data,
+						"error":      "success",
+						"request_id": req["request_id"],
+					})
+					if _, err := conn.Write(append(resp, '\n')); err != nil {
+						return
+					}
+				}
+			}(conn)
+		}
+	}()
+	return socket
+}
+
+// MPV reports playlist-pos = -1 once it goes idle (episode reached its natural
+// end). That must never resolve to playlist row 0, which the selection watcher
+// would act on as "user picked the first episode".
+func TestPlaylistPosRejectsIdleMPV(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix socket fake mpv")
+	}
+	c := &MPVPlaylistController{socket: fakeMPVSocket(t, -1)}
+	pos, err := c.playlistPos()
+	if err == nil {
+		t.Fatalf("idle mpv: expected error, got pos=%d", pos)
+	}
+	if pos >= 0 {
+		t.Fatalf("idle mpv resolved to playlist row %d", pos)
+	}
+}
+
+func TestPlaylistPosReturnsActiveIndex(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix socket fake mpv")
+	}
+	c := &MPVPlaylistController{socket: fakeMPVSocket(t, 16)}
+	pos, err := c.playlistPos()
+	if err != nil || pos != 16 {
+		t.Fatalf("active mpv: pos=%d err=%v want 16", pos, err)
+	}
+}
+
+// MPV sitting idle (EOF on the last entry) can never report time-pos again:
+// the monitor must end the session instead of waiting forever.
+func TestClassifyPlaybackLossExitsOnIdleMPV(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix socket fake mpv")
+	}
+	endMPVPlaylistSwitch()
+
+	idle := fakeMPVSocket(t, true) // idle-active = true
+	if got := ClassifyPlaybackLoss(idle, true, 40, 85); got != PlaybackLossExit {
+		t.Fatalf("idle mpv below threshold: got %d want Exit", got)
+	}
+	if got := ClassifyPlaybackLoss(idle, true, 95, 85); got != PlaybackLossComplete {
+		t.Fatalf("idle mpv past threshold: got %d want Complete", got)
+	}
+
+	playing := fakeMPVSocket(t, false) // idle-active = false
+	if got := ClassifyPlaybackLoss(playing, true, 40, 85); got != PlaybackLossWait {
+		t.Fatalf("live mpv below threshold: got %d want Wait", got)
 	}
 }

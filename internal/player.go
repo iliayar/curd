@@ -673,11 +673,31 @@ func ClassifyPlaybackLoss(socketPath string, started bool, percentageWatched flo
 	if int(percentageWatched) >= completeThreshold {
 		return PlaybackLossComplete
 	}
-	// MPV still open with incomplete watch → wait (playlist jump, pause, buffer).
+	// MPV alive but idling with nothing loaded: playback really ended (natural
+	// end of file, "stop", failed load). A time-pos will never come back, so
+	// waiting would hang the session on an empty window.
 	if socketPath != "" && IsMPVRunning(socketPath) {
+		if MPVIsIdleNoFile(socketPath) {
+			return PlaybackLossExit
+		}
+		// Transient gap (playlist jump, pause, buffer) → keep monitoring.
 		return PlaybackLossWait
 	}
 	return PlaybackLossExit
+}
+
+// MPVIsIdleNoFile reports whether MPV is running with no file loaded.
+// True after the last playlist entry reaches EOF (mpv started with --idle=yes).
+func MPVIsIdleNoFile(ipcSocketPath string) bool {
+	if ipcSocketPath == "" {
+		return false
+	}
+	value, err := MPVSendCommand(ipcSocketPath, []interface{}{"get_property", "idle-active"})
+	if err != nil || value == nil {
+		return false
+	}
+	idle, ok := value.(bool)
+	return ok && idle
 }
 
 // Helper function to join args with a space
